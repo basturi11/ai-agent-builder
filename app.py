@@ -21,7 +21,7 @@ def agent():
     if not user_message:
         return jsonify({'response': 'Ketik dulu perintahnya bro.'})
     
-    if not OPENROUTER_API_KEY or OPENROUTER_API_KEY.startswith('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'):
+    if not OPENROUTER_API_KEY or OPENROUTER_API_KEY.startswith('sk-or-v1-ISI'):
         return jsonify({'response': 'Error: API key belum di-set. Ganti OPENROUTER_API_KEY di app.py atau set environment variable.'})
     
     try:

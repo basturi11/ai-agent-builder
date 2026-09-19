@@ -1,7 +1,7 @@
 import os
 import json
 import requests
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -10,10 +10,10 @@ CORS(app)
 # ============================================
 # KONFIGURASI - GANTI INI
 # ============================================
-OPENAI_API_KEY = "ISI_API_KEY_LU_DISINI"  # Dari https://platform.openai.com
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "ISI_API_KEY_LU_DISINI")
 # ============================================
 
-HTML_PAGE = """
+HTML_PAGE = '''
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -23,7 +23,7 @@ HTML_PAGE = """
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: #0a0a0a;
             color: #fff;
             min-height: 100vh;
@@ -63,6 +63,7 @@ HTML_PAGE = """
             border-radius: 10px;
             max-width: 85%;
             word-wrap: break-word;
+            white-space: pre-wrap;
         }
         .user-msg {
             background: #d4af37;
@@ -75,14 +76,6 @@ HTML_PAGE = """
             color: #fff;
             margin-right: auto;
             border-left: 3px solid #d4af37;
-        }
-        .agent-msg pre {
-            background: #0a0a0a;
-            padding: 10px;
-            border-radius: 5px;
-            overflow-x: auto;
-            margin-top: 10px;
-            font-size: 0.85em;
         }
         .input-area {
             display: flex;
@@ -143,72 +136,123 @@ HTML_PAGE = """
 </head>
 <body>
     <div class="container">
-        <h1>🤖 AI Agent Builder</h1>
+        <h1>AI Agent Builder</h1>
         <p class="subtitle">Ketik perintah, agent yang kerja. Bisa bikin website, aplikasi, atau apa aja.</p>
         
         <div class="chat-box" id="chatBox">
             <div class="message agent-msg">
-                👋 Halo! Gue AI Agent lu. Ketik perintah kayak:<br><br>
-                • "Bikinin website toko baju"<br>
-                • "Bikinin landing page buat bisnis kopi"<br>
-                • "Bikinin aplikasi kalkulator"<br>
-                • "Bikinin website portfolio fotografer"<br><br>
+                Halo! Gue AI Agent lu. Ketik perintah kayak:
+
+                - "Bikinin website toko baju"
+                - "Bikinin landing page buat bisnis kopi"
+                - "Bikinin aplikasi kalkulator"
+                - "Bikinin website portfolio fotografer"
+
                 Tinggal ketik, gue yang kerjain.
             </div>
         </div>
         
         <div class="input-area">
-            <input type="text" id="userInput" placeholder="Ketik perintah lu di sini..." onkeypress="if(event.key==='Enter') sendMessage()">
+            <input type="text" id="userInput" placeholder="Ketik perintah lu di sini..." onkeypress="if(event.key==="Enter") sendMessage()">
             <button id="sendBtn" onclick="sendMessage()">Kirim</button>
         </div>
-        <p class="status">⚡ Powered by AI Agent</p>
+        <p class="status">Powered by AI Agent</p>
     </div>
 
     <script>
         async function sendMessage() {
-            const input = document.getElementById('userInput');
-            const chatBox = document.getElementById('chatBox');
-            const sendBtn = document.getElementById('sendBtn');
+            const input = document.getElementById("userInput");
+            const chatBox = document.getElementById("chatBox");
+            const sendBtn = document.getElementById("sendBtn");
             const message = input.value.trim();
             
             if (!message) return;
             
-            // Tampilkan pesan user
             chatBox.innerHTML += `<div class="message user-msg">${message}</div>`;
-            input.value = '';
+            input.value = "";
             chatBox.scrollTop = chatBox.scrollHeight;
             
-            // Tampilkan loading
             chatBox.innerHTML += `<div class="message agent-msg"><span class="loading"></span> Agent lagi kerja...</div>`;
             chatBox.scrollTop = chatBox.scrollHeight;
             sendBtn.disabled = true;
             
             try {
-                const response = await fetch('/api/agent', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                const response = await fetch("/api/agent", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ message: message })
                 });
                 
                 const data = await response.json();
                 
-                // Hapus loading
                 chatBox.innerHTML = chatBox.innerHTML.replace(
                     /<div class="message agent-msg"><span class="loading"><\/span> Agent lagi kerja...<\/div>/,
-                    ''
+                    ""
                 );
                 
-                // Tampilkan respons
-                const formattedResponse = data.response.replace(/\\n/g, '<br>').replace(/
-```([\\s\\S]*?)
-```/g, '<pre>$1</pre>');
+                const formattedResponse = data.response.replace(/</g, "&lt;").replace(/>/g, "&gt;");
                 chatBox.innerHTML += `<div class="message agent-msg">${formattedResponse}</div>`;
                 chatBox.scrollTop = chatBox.scrollHeight;
                 
             } catch (error) {
                 chatBox.innerHTML = chatBox.innerHTML.replace(
                     /<div class="message agent-msg"><span class="loading"><\/span> Agent lagi kerja...<\/div>/,
-                    ''
+                    ""
                 );
-                chatBox.innerHTML += `<div class="message agent-msg">❌ Error: ${error.message}</div>`;
-                chatBox.sc
+                chatBox.innerHTML += `<div class="message agent-msg">Error: ${error.message}</div>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+            
+            sendBtn.disabled = false;
+        }
+    </script>
+</body>
+</html>
+'''
+
+@app.route('/')
+def home():
+    return HTML_PAGE
+
+@app.route('/api/agent', methods=['POST'])
+def agent():
+    data = request.json
+    user_message = data.get('message', '')
+    
+    if not user_message:
+        return jsonify({'response': 'Ketik dulu perintahnya bro.'})
+    
+    try:
+        response = requests.post(
+            'https://api.openai.com/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {OPENAI_API_KEY}',
+                'Content-Type': 'application/json'
+            },
+            json={
+                'model': 'gpt-4o-mini',
+                'messages': [
+                    {
+                        'role': 'system',
+                        'content': 'Kamu adalah AI Agent yang bisa bikin website dan aplikasi. Kalau user minta bikin sesuatu, langsung kasih kode lengkap HTML/CSS/JS yang bisa langsung dipakai. Jangan banyak tanya, langsung kerjakan. Format kode pakai markdown code block.'
+                    },
+                    {
+                        'role': 'user',
+                        'content': user_message
+                    }
+                ],
+                'max_tokens': 4000
+            },
+            timeout=60
+        )
+        
+        result = response.json()
+        ai_response = result['choices'][0]['message']['content']
+        
+        return jsonify({'response': ai_response})
+        
+    except Exception as e:
+        return jsonify({'response': f'Error: {str(e)}. Cek API key lu.'})
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))

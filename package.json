@@ -1,0 +1,12 @@
+{
+  "name": "ai-agent-builder",
+  "version": "1.0.0",
+  "description": "AI Agent Builder with Vercel Web Analytics",
+  "private": true,
+  "dependencies": {
+    "@vercel/analytics": "^1.4.1"
+  },
+  "scripts": {
+    "postinstall": "echo 'Dependencies installed successfully'"
+  }
+}
